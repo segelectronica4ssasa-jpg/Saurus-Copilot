@@ -226,12 +226,18 @@
             }).join(', ') || '—';
 
             var isSA = u.role === 'superadmin';
-            var editBtn = isSA ? '' :
-                '<button class="auth-btn auth-btn-ghost auth-btn-sm" onclick="SaurusAdminPanel.editUser(\'' + u.id + '\')" title="Editar">✏️</button>';
-            var toggleBtn = isSA ? '' :
-                '<button class="auth-btn auth-btn-ghost auth-btn-sm" onclick="SaurusAdminPanel.toggleUser(\'' + u.id + '\')" title="' + (u.active ? 'Desactivar' : 'Activar') + '">' + (u.active ? '🔒' : '🔓') + '</button>';
-            var deleteBtn = isSA ? '' :
-                '<button class="auth-btn auth-btn-danger auth-btn-sm" onclick="SaurusAdminPanel.confirmDeleteUser(\'' + u.id + '\',\'' + u.username + '\')" title="Eliminar">🗑️</button>';
+            var currentSession = SaurusAuth.getSession();
+            var canEditThisUser = SaurusAuth.isSuperAdmin() || (currentSession && currentSession.role === 'admin' && u.role === 'user');
+
+            var editBtn = canEditThisUser ?
+                '<button class="auth-btn auth-btn-ghost auth-btn-sm" onclick="SaurusAdminPanel.editUser(\'' + u.id + '\')" title="Editar">✏️</button>' : '';
+            var toggleBtn = canEditThisUser ?
+                '<button class="auth-btn auth-btn-ghost auth-btn-sm" onclick="SaurusAdminPanel.toggleUser(\'' + u.id + '\')" title="' + (u.active ? 'Desactivar' : 'Activar') + '">' + (u.active ? '🔒' : '🔓') + '</button>' : '';
+            var deleteBtn = canEditThisUser ?
+                '<button class="auth-btn auth-btn-danger auth-btn-sm" onclick="SaurusAdminPanel.confirmDeleteUser(\'' + u.id + '\',\'' + u.username + '\')" title="Eliminar">🗑️</button>' : '';
+
+            var actionsContent = (editBtn || toggleBtn || deleteBtn) ?
+                (editBtn + toggleBtn + deleteBtn) : '<span style="font-size:0.75rem;color:var(--auth-muted)">Protegido</span>';
 
             return '<tr>' +
                 '<td><strong>' + u.username + '</strong></td>' +
@@ -239,7 +245,7 @@
                 '<td><span class="auth-role-badge ' + u.role + '">' + roleName(u.role) + '</span></td>' +
                 '<td style="font-size:0.78rem;color:var(--auth-muted)">' + assignedLabels + '</td>' +
                 '<td><span class="auth-status-badge ' + (u.active ? 'active' : 'inactive') + '">' + (u.active ? 'Activo' : 'Inactivo') + '</span></td>' +
-                '<td><div class="auth-row-actions">' + editBtn + toggleBtn + deleteBtn + '</div></td>' +
+                '<td><div class="auth-row-actions">' + actionsContent + '</div></td>' +
                 '</tr>';
         }).join('');
     }
@@ -255,14 +261,23 @@
         var users = SaurusAuth.listUsers().filter(function (u) { return u.role !== 'superadmin'; });
 
         if (vehicles.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6"><div class="auth-empty-state"><p>No hay vehículos registrados.</p></div></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6"><div class="auth-empty-state"><p>No hay vehículos registrados en la flota.</p></div></td></tr>';
             return;
         }
+
+        var isSA = SaurusAuth.isSuperAdmin();
 
         tbody.innerHTML = vehicles.map(function (v) {
             var assignedTo = users.filter(function (u) {
                 return (u.assignedVehicles || []).includes(v.id);
             }).map(function (u) { return u.username; }).join(', ') || '—';
+
+            var actionsHtml = isSA ? (
+                '<div class="auth-row-actions">' +
+                  '<button class="auth-btn auth-btn-ghost auth-btn-sm" onclick="SaurusAdminPanel.editVehicle(\'' + v.id + '\')" title="Editar">✏️</button>' +
+                  '<button class="auth-btn auth-btn-danger auth-btn-sm" onclick="SaurusAdminPanel.confirmDeleteVehicle(\'' + v.id + '\',\'' + v.plate + '\')" title="Eliminar">🗑️</button>' +
+                '</div>'
+            ) : '<span style="font-size:0.75rem;color:var(--auth-muted)">Solo lectura</span>';
 
             return '<tr>' +
                 '<td class="veh-type-icon">' + (VEH_ICONS[v.type] || '🚗') + '</td>' +
@@ -270,10 +285,7 @@
                 '<td>' + v.alias + '</td>' +
                 '<td style="font-size:0.78rem;color:var(--auth-muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (v.description || '—') + '</td>' +
                 '<td style="font-size:0.78rem;color:var(--auth-muted)">' + assignedTo + '</td>' +
-                '<td><div class="auth-row-actions">' +
-                  '<button class="auth-btn auth-btn-ghost auth-btn-sm" onclick="SaurusAdminPanel.editVehicle(\'' + v.id + '\')" title="Editar">✏️</button>' +
-                  '<button class="auth-btn auth-btn-danger auth-btn-sm" onclick="SaurusAdminPanel.confirmDeleteVehicle(\'' + v.id + '\',\'' + v.plate + '\')" title="Eliminar">🗑️</button>' +
-                '</div></td>' +
+                '<td>' + actionsHtml + '</td>' +
                 '</tr>';
         }).join('');
     }
@@ -296,6 +308,14 @@
         var container = document.getElementById('form-vehicles-assign');
         var empty = document.getElementById('form-vehicles-empty');
         if (!container) return;
+
+        var isSA = SaurusAuth.isSuperAdmin();
+        if (!isSA) {
+            container.innerHTML = '<p style="font-size:0.78rem;color:var(--auth-muted);padding:4px 0;">ℹ️ Solo el SuperAdministrador puede asignar vehículos a usuarios.</p>';
+            if (empty) empty.style.display = 'none';
+            return;
+        }
+
         var vehicles = SaurusAuth.listVehicles();
         if (vehicles.length === 0) {
             container.innerHTML = '';
@@ -320,17 +340,26 @@
         var titleEl = document.getElementById('user-form-title-text');
         if (!panel) return;
 
+        var isSA = SaurusAuth.isSuperAdmin();
+
         document.getElementById('edit-user-id').value = userData ? userData.id : '';
         document.getElementById('form-username').value = userData ? userData.username : '';
         document.getElementById('form-username').disabled = !!userData; // no editar username
         document.getElementById('form-displayname').value = userData ? userData.displayName : '';
         document.getElementById('form-password').value = '';
         document.getElementById('form-password').placeholder = userData ? 'Dejar vacío para no cambiar' : '••••••••';
-        document.getElementById('form-role').value = userData ? userData.role : 'user';
+        
+        var roleSelect = document.getElementById('form-role');
+        if (roleSelect) {
+            roleSelect.value = userData ? userData.role : 'user';
+            // Un admin no puede crear otro admin
+            var adminOpt = roleSelect.querySelector('option[value="admin"]');
+            if (adminOpt) adminOpt.disabled = !isSA;
+        }
 
         titleEl.textContent = userData ? 'Editar Usuario' : 'Crear Usuario';
 
-        var defaultPerms = SaurusAuth.DEFAULT_PERMISSIONS[document.getElementById('form-role').value];
+        var defaultPerms = SaurusAuth.DEFAULT_PERMISSIONS[roleSelect ? roleSelect.value : 'user'];
         renderPermsGrid(userData ? userData.permissions : defaultPerms);
         renderVehiclesAssign(userData ? userData.assignedVehicles : []);
 
@@ -364,6 +393,11 @@
         var permissions = getFormPermissions();
         var assignedVehicles = getFormVehicles();
 
+        // Si no se marcó ningún permiso, usar los defaults del rol (nunca guardar [])
+        if (permissions.length === 0) {
+            permissions = SaurusAuth.DEFAULT_PERMISSIONS[role] || SaurusAuth.DEFAULT_PERMISSIONS.user;
+        }
+
         var result;
         if (editId) {
             // Actualizar
@@ -374,18 +408,27 @@
             // Crear
             if (!username) { showFeedback('users-feedback', 'El nombre de usuario es obligatorio.', 'error'); return; }
             if (!password) { showFeedback('users-feedback', 'La contraseña es obligatoria.', 'error'); return; }
-            result = SaurusAuth.createUser({ username: username, password: password, displayName: displayName, role: role, permissions: permissions, assignedVehicles: assignedVehicles });
+            if (password.length < 4) { showFeedback('users-feedback', 'La contraseña debe tener al menos 4 caracteres.', 'error'); return; }
+            result = SaurusAuth.createUser({
+                username: username,
+                password: password,
+                displayName: displayName,
+                role: role,
+                permissions: permissions,
+                assignedVehicles: assignedVehicles
+            });
         }
 
         if (result.success) {
             showFeedback('users-feedback', editId ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.', 'success');
             closeUserForm();
             renderUsersTable();
-            updateVehicleSelector(); // refrescar selector de vehículo en header
+            updateVehicleSelector();
         } else {
             showFeedback('users-feedback', result.error || 'Error al guardar.', 'error');
         }
     }
+
 
     // ─── Formulario de Vehículos ───────────────────────────────────────────────
 
@@ -529,9 +572,14 @@
     // ─── Abrir / Cerrar modal ──────────────────────────────────────────────────
 
     function open() {
-        if (!SaurusAuth.isSuperAdmin()) return;
+        if (!SaurusAuth.canManageUsers()) return;
         var overlay = document.getElementById('auth-admin-overlay');
         if (!overlay) return;
+
+        var isSA = SaurusAuth.isSuperAdmin();
+        var btnShowVeh = document.getElementById('btn-show-vehicle-form');
+        if (btnShowVeh) btnShowVeh.style.display = isSA ? 'inline-flex' : 'none';
+
         renderUsersTable();
         renderVehiclesTable();
         overlay.classList.add('open');

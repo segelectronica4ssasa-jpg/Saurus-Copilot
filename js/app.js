@@ -19,25 +19,71 @@ document.addEventListener('DOMContentLoaded', function () {
     var loginPassword = document.getElementById('login-password');
     var loginError = document.getElementById('login-error-msg');
 
+    function renderLoginAccounts() {
+        var container = document.getElementById('auth-quick-accounts');
+        if (!container || !SaurusAuth.getPublicUserSummary) return;
+        var list = SaurusAuth.getPublicUserSummary();
+        if (list.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        var chipsHtml = list.map(function (u) {
+            var roleMap = { superadmin: 'SuperAdmin', admin: 'Admin', user: 'Usuario' };
+            var roleLabel = roleMap[u.role] || u.role;
+            return '<button type="button" class="auth-user-chip ' + (u.active ? '' : 'inactive') + '" data-user="' + u.username + '" title="Clic para seleccionar">' +
+                '<span>👤 ' + u.username + '</span>' +
+                '<small>(' + roleLabel + ')</small>' +
+                '</button>';
+        }).join('');
+
+        container.innerHTML = '<div class="auth-quick-title">Cuentas registradas en este equipo:</div>' +
+            '<div class="auth-quick-chips">' + chipsHtml + '</div>';
+
+        container.querySelectorAll('.auth-user-chip').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var uname = btn.dataset.user;
+                if (loginUsername) {
+                    loginUsername.value = uname;
+                    if (loginPassword) {
+                        loginPassword.value = '';
+                        loginPassword.focus();
+                    }
+                }
+            });
+        });
+    }
+
+    renderLoginAccounts();
+
     function attemptLogin() {
-        var u = loginUsername.value;
-        var p = loginPassword.value;
-        loginBtn.disabled = true;
-        loginError.classList.remove('visible');
+        var u = loginUsername ? loginUsername.value : '';
+        var p = loginPassword ? loginPassword.value : '';
+        if (loginBtn) loginBtn.disabled = true;
+        if (loginError) loginError.classList.remove('visible');
 
         var result = SaurusAuth.login(u, p);
         if (result.success) {
-            overlay.classList.add('auth-fade-out');
-            setTimeout(function () {
-                overlay.style.display = 'none';
-            }, 420);
+            if (loginBtn) loginBtn.disabled = false;
+            if (overlay) {
+                overlay.classList.add('auth-fade-out');
+                setTimeout(function () {
+                    overlay.style.display = 'none';
+                }, 420);
+            }
             updateAuthUI();
+            updateVehicleDashboardHeader();
         } else {
-            loginError.textContent = result.error;
-            loginError.classList.add('visible');
-            loginPassword.value = '';
-            loginPassword.focus();
-            setTimeout(function () { loginBtn.disabled = false; }, 800);
+            if (loginError) {
+                loginError.textContent = result.error || 'Credenciales incorrectas.';
+                loginError.classList.add('visible');
+            }
+            if (loginPassword) {
+                loginPassword.value = '';
+                loginPassword.focus();
+            }
+            renderLoginAccounts();
+            setTimeout(function () { if (loginBtn) loginBtn.disabled = false; }, 400);
         }
     }
 
@@ -54,6 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (SaurusAuth.isLoggedIn()) {
         if (overlay) overlay.style.display = 'none';
         updateAuthUI();
+        updateVehicleDashboardHeader();
     }
 
     // ─── 0b. UI de Auth: Badge de usuario y controles ────────────────────────
@@ -81,9 +128,9 @@ document.addEventListener('DOMContentLoaded', function () {
             badgeInitials.textContent = initials.toUpperCase();
         }
 
-        // Mostrar/ocultar opcion admin
+        // Mostrar panel admin si es SuperAdmin o Admin
         var adminBtn = document.getElementById('btn-open-admin-panel');
-        if (adminBtn) adminBtn.style.display = SaurusAuth.isSuperAdmin() ? 'flex' : 'none';
+        if (adminBtn) adminBtn.style.display = SaurusAuth.canManageUsers() ? 'flex' : 'none';
 
         // Actualizar selector de vehículo
         SaurusAdminPanel.updateVehicleSelector();
@@ -92,22 +139,46 @@ document.addEventListener('DOMContentLoaded', function () {
         applyPermissions(session);
     }
 
+    function updateVehicleDashboardHeader() {
+        var v = SaurusAuth.getActiveVehicle();
+        var iconEl = document.getElementById('trip-icon-badge');
+        var titleEl = document.getElementById('route-title');
+        if (!v) {
+            var vehicles = SaurusAuth.listVehicles();
+            if (vehicles.length > 0) {
+                v = vehicles[0];
+                SaurusAuth.setActiveVehicle(v.id);
+            }
+        }
+        if (v) {
+            var iconMap = { car: '🚗', truck: '🚛', van: '🚐', motorcycle: '🏍', bus: '🚌' };
+            if (iconEl) iconEl.textContent = iconMap[v.type] || '🚗';
+            if (titleEl) titleEl.textContent = v.plate + ' (' + v.alias + ') — Monitoreo Activo';
+        } else {
+            if (titleEl) titleEl.textContent = 'Sin Vehículo Asignado';
+        }
+    }
+
     function applyPermissions(session) {
         // Cargar telemetría
         var fileInput = document.getElementById('file-input');
         var fileLabel = fileInput ? fileInput.previousElementSibling : null;
         var canUploadTelemetry = SaurusAuth.hasPermission('upload_telemetry');
         if (fileInput) fileInput.disabled = !canUploadTelemetry;
-        if (fileLabel) fileLabel.style.opacity = canUploadTelemetry ? '1' : '0.35';
-        if (fileLabel) fileLabel.style.pointerEvents = canUploadTelemetry ? '' : 'none';
+        if (fileLabel) {
+            fileLabel.style.opacity = canUploadTelemetry ? '1' : '0.35';
+            fileLabel.style.pointerEvents = canUploadTelemetry ? '' : 'none';
+        }
 
         // Cargar video
         var videoInput = document.getElementById('video-input');
         var videoLabel = videoInput ? videoInput.previousElementSibling : null;
         var canUploadVideo = SaurusAuth.hasPermission('upload_video');
         if (videoInput) videoInput.disabled = !canUploadVideo;
-        if (videoLabel) videoLabel.style.opacity = canUploadVideo ? '1' : '0.35';
-        if (videoLabel) videoLabel.style.pointerEvents = canUploadVideo ? '' : 'none';
+        if (videoLabel) {
+            videoLabel.style.opacity = canUploadVideo ? '1' : '0.35';
+            videoLabel.style.pointerEvents = canUploadVideo ? '' : 'none';
+        }
 
         // Exportar reporte
         var reportBtn = document.getElementById('btn-export-report');
@@ -173,6 +244,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (vehicleSelect) {
         vehicleSelect.addEventListener('change', function () {
             SaurusAuth.setActiveVehicle(vehicleSelect.value);
+            updateVehicleDashboardHeader();
+            var v = SaurusAuth.getActiveVehicle();
+            if (v && window.showNotification) {
+                window.showNotification('Vehículo activo: ' + v.plate + ' (' + v.alias + ')', 'info');
+            }
         });
     }
 

@@ -815,3 +815,58 @@
     .auth-form-grid { grid-template-columns: 1fr; }
     .auth-badge-name { max-width: 80px; }
 }
+
+/* ─── Cuentas rápidas en Login Card ──────────────────────────────────────── */
+.auth-quick-accounts {
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1px dashed rgba(0, 212, 255, 0.18);
+    width: 100%;
+}
+
+.auth-quick-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--auth-muted);
+    margin-bottom: 8px;
+    text-align: left;
+}
+
+.auth-quick-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-start;
+}
+
+.auth-user-chip {
+    background: rgba(0, 212, 255, 0.06);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    color: #e2f7ff;
+    padding: 5px 9px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s ease;
+}
+
+.auth-user-chip:hover {
+    background: rgba(0, 212, 255, 0.15);
+    border-color: rgba(0, 212, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.auth-user-chip small {
+    font-size: 0.68rem;
+    color: var(--auth-muted);
+}
+
+.auth-user-chip.inactive {
+    opacity: 0.5;
+    border-color: rgba(255, 71, 87, 0.3);
+}
