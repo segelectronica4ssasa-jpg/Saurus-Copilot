@@ -95,9 +95,10 @@
             </p>
           </div>
 
+          <div id="user-form-inline-error" class="auth-feedback" style="margin-bottom:12px;display:none"></div>
           <div class="auth-form-footer">
             <button class="auth-btn auth-btn-ghost" id="btn-cancel-user-form">Cancelar</button>
-            <button class="auth-btn auth-btn-primary" id="btn-save-user-form">Guardar</button>
+            <button class="auth-btn auth-btn-primary" id="btn-save-user-form">Guardar Usuario</button>
           </div>
         </div>
 
@@ -229,6 +230,9 @@
             var currentSession = SaurusAuth.getSession();
             var canEditThisUser = SaurusAuth.isSuperAdmin() || (currentSession && currentSession.role === 'admin' && u.role === 'user');
 
+            var switchBtn = (currentSession && currentSession.userId !== u.id && u.active) ?
+                '<button class="auth-btn auth-btn-primary auth-btn-sm" onclick="SaurusAdminPanel.loginAsUser(\'' + u.id + '\')" title="Iniciar sesión inmediatamente con este usuario" style="background:linear-gradient(135deg,#00b4d8,#0077b6);color:#fff;font-weight:700">🔑 Entrar</button>' : '';
+
             var editBtn = canEditThisUser ?
                 '<button class="auth-btn auth-btn-ghost auth-btn-sm" onclick="SaurusAdminPanel.editUser(\'' + u.id + '\')" title="Editar">✏️</button>' : '';
             var toggleBtn = canEditThisUser ?
@@ -236,8 +240,8 @@
             var deleteBtn = canEditThisUser ?
                 '<button class="auth-btn auth-btn-danger auth-btn-sm" onclick="SaurusAdminPanel.confirmDeleteUser(\'' + u.id + '\',\'' + u.username + '\')" title="Eliminar">🗑️</button>' : '';
 
-            var actionsContent = (editBtn || toggleBtn || deleteBtn) ?
-                (editBtn + toggleBtn + deleteBtn) : '<span style="font-size:0.75rem;color:var(--auth-muted)">Protegido</span>';
+            var actionsContent = (switchBtn + editBtn + toggleBtn + deleteBtn) ||
+                '<span style="font-size:0.75rem;color:var(--auth-muted)">Protegido</span>';
 
             return '<tr>' +
                 '<td><strong>' + u.username + '</strong></td>' +
@@ -393,6 +397,18 @@
         var permissions = getFormPermissions();
         var assignedVehicles = getFormVehicles();
 
+        var inlineErr = document.getElementById('user-form-inline-error');
+        function setFormError(msg) {
+            if (inlineErr) {
+                inlineErr.textContent = msg;
+                inlineErr.className = 'auth-feedback error';
+                inlineErr.style.display = 'block';
+            }
+            showFeedback('users-feedback', msg, 'error');
+        }
+
+        if (inlineErr) inlineErr.style.display = 'none';
+
         // Si no se marcó ningún permiso, usar los defaults del rol (nunca guardar [])
         if (permissions.length === 0) {
             permissions = SaurusAuth.DEFAULT_PERMISSIONS[role] || SaurusAuth.DEFAULT_PERMISSIONS.user;
@@ -406,9 +422,8 @@
             result = SaurusAuth.updateUser(editId, updates);
         } else {
             // Crear
-            if (!username) { showFeedback('users-feedback', 'El nombre de usuario es obligatorio.', 'error'); return; }
-            if (!password) { showFeedback('users-feedback', 'La contraseña es obligatoria.', 'error'); return; }
-            if (password.length < 4) { showFeedback('users-feedback', 'La contraseña debe tener al menos 4 caracteres.', 'error'); return; }
+            if (!username) { setFormError('El nombre de usuario es obligatorio.'); return; }
+            if (!password) { setFormError('La contraseña es obligatoria.'); return; }
             result = SaurusAuth.createUser({
                 username: username,
                 password: password,
@@ -420,12 +435,35 @@
         }
 
         if (result.success) {
-            showFeedback('users-feedback', editId ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.', 'success');
+            var created = result.user;
             closeUserForm();
             renderUsersTable();
             updateVehicleSelector();
+
+            if (!editId && created) {
+                var doSwitch = confirm('¡Usuario "' + (created.displayName || created.username) + '" registrado correctamente!\n\n¿Deseas iniciar sesión inmediatamente con esta cuenta para probarla?');
+                if (doSwitch) {
+                    loginAsUser(created.id);
+                    return;
+                }
+            }
+            showFeedback('users-feedback', editId ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.', 'success');
         } else {
-            showFeedback('users-feedback', result.error || 'Error al guardar.', 'error');
+            setFormError(result.error || 'Error al guardar el usuario.');
+        }
+    }
+
+    function loginAsUser(userId) {
+        var res = SaurusAuth.switchSession(userId);
+        if (res.success) {
+            close();
+            if (window.updateAuthUI) window.updateAuthUI();
+            if (window.updateVehicleDashboardHeader) window.updateVehicleDashboardHeader();
+            if (window.showNotification) {
+                window.showNotification('Sesión activa: ' + res.session.displayName + ' (' + res.session.role + ')', 'success');
+            }
+        } else {
+            alert(res.error || 'No se pudo iniciar sesión con este usuario.');
         }
     }
 
@@ -669,6 +707,7 @@
         open: open,
         close: close,
         updateVehicleSelector: updateVehicleSelector,
+        loginAsUser: loginAsUser,
         // Expuestas para onclick en tabla:
         editUser: editUser,
         toggleUser: toggleUser,

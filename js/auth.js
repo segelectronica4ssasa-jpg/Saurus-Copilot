@@ -234,6 +234,29 @@
         clearSession();
     }
 
+    /**
+     * Inicia sesión directamente como un usuario por su ID (para pruebas y cambio rápido de sesión).
+     */
+    function switchSession(userId) {
+        var users = getUsers();
+        var user = users.find(function(u) { return u.id === userId; });
+        if (!user) return { success: false, error: 'Usuario no encontrado.' };
+        if (user.active === false) return { success: false, error: 'La cuenta está desactivada.' };
+        var session = setSession(user);
+        return { success: true, session: session };
+    }
+
+    /**
+     * Vuelve rápidamente a la sesión de SuperAdministrador.
+     */
+    function switchToSuperAdmin() {
+        var users = getUsers();
+        var sa = users.find(function(u) { return u.role === ROLES.SUPERADMIN; });
+        if (!sa) return { success: false, error: 'SuperAdmin no configurado.' };
+        var session = setSession(sa);
+        return { success: true, session: session };
+    }
+
     // ─── Permisos ──────────────────────────────────────────────────────────────
 
     function hasPermission(permKey) {
@@ -480,6 +503,8 @@
         init: initDefaultData,
         login: login,
         logout: logout,
+        switchSession: switchSession,
+        switchToSuperAdmin: switchToSuperAdmin,
         isLoggedIn: isLoggedIn,
         getSession: getSession,
         hasPermission: hasPermission,

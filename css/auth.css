@@ -861,12 +861,44 @@
     transform: translateY(-1px);
 }
 
-.auth-user-chip small {
-    font-size: 0.68rem;
-    color: var(--auth-muted);
-}
-
 .auth-user-chip.inactive {
     opacity: 0.5;
     border-color: rgba(255, 71, 87, 0.3);
+}
+
+.auth-user-chip-wrap {
+    display: inline-flex;
+    align-items: stretch;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(0, 212, 255, 0.25);
+    background: rgba(0, 212, 255, 0.05);
+}
+
+.auth-user-chip-wrap .auth-user-chip {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 5px 8px;
+}
+
+.auth-chip-quick-btn {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.25), rgba(0, 168, 200, 0.45));
+    border: none;
+    border-left: 1px solid rgba(0, 212, 255, 0.25);
+    color: #00f2fe;
+    padding: 4px 8px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+
+.auth-chip-quick-btn:hover {
+    background: rgba(0, 242, 254, 0.4);
+    color: #fff;
+    box-shadow: 0 0 8px rgba(0, 242, 254, 0.5);
 }

@@ -31,13 +31,16 @@ document.addEventListener('DOMContentLoaded', function () {
         var chipsHtml = list.map(function (u) {
             var roleMap = { superadmin: 'SuperAdmin', admin: 'Admin', user: 'Usuario' };
             var roleLabel = roleMap[u.role] || u.role;
-            return '<button type="button" class="auth-user-chip ' + (u.active ? '' : 'inactive') + '" data-user="' + u.username + '" title="Clic para seleccionar">' +
+            return '<div class="auth-user-chip-wrap">' +
+                '<button type="button" class="auth-user-chip ' + (u.active ? '' : 'inactive') + '" data-user="' + u.username + '" title="Rellenar usuario">' +
                 '<span>👤 ' + u.username + '</span>' +
                 '<small>(' + roleLabel + ')</small>' +
-                '</button>';
+                '</button>' +
+                '<button type="button" class="auth-chip-quick-btn" data-direct="' + u.username + '" title="Entrar directamente con esta cuenta">⚡ Entrar</button>' +
+                '</div>';
         }).join('');
 
-        container.innerHTML = '<div class="auth-quick-title">Cuentas registradas en este equipo:</div>' +
+        container.innerHTML = '<div class="auth-quick-title">Cuentas registradas (clic para rellenar o botón para entrar):</div>' +
             '<div class="auth-quick-chips">' + chipsHtml + '</div>';
 
         container.querySelectorAll('.auth-user-chip').forEach(function (btn) {
@@ -48,6 +51,28 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (loginPassword) {
                         loginPassword.value = '';
                         loginPassword.focus();
+                    }
+                }
+            });
+        });
+
+        container.querySelectorAll('.auth-chip-quick-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var uname = btn.dataset.direct;
+                var allUsers = JSON.parse(localStorage.getItem('saurus_users') || '[]');
+                var uObj = allUsers.find(function (x) { return (x.username || '').toLowerCase() === uname.toLowerCase(); });
+                if (uObj) {
+                    var res = SaurusAuth.switchSession(uObj.id);
+                    if (res.success) {
+                        if (overlay) {
+                            overlay.classList.add('auth-fade-out');
+                            setTimeout(function () { overlay.style.display = 'none'; }, 420);
+                        }
+                        updateAuthUI();
+                        updateVehicleDashboardHeader();
+                        if (window.showNotification) {
+                            window.showNotification('Acceso exitoso: ' + res.session.displayName + ' (' + res.session.role + ')', 'success');
+                        }
                     }
                 }
             });
@@ -131,6 +156,10 @@ document.addEventListener('DOMContentLoaded', function () {
         // Mostrar panel admin si es SuperAdmin o Admin
         var adminBtn = document.getElementById('btn-open-admin-panel');
         if (adminBtn) adminBtn.style.display = SaurusAuth.canManageUsers() ? 'flex' : 'none';
+
+        // Mostrar botón para regresar a SuperAdmin si estamos en otro usuario
+        var switchBackBtn = document.getElementById('btn-switch-superadmin');
+        if (switchBackBtn) switchBackBtn.style.display = (session.role !== 'superadmin') ? 'flex' : 'none';
 
         // Actualizar selector de vehículo
         SaurusAdminPanel.updateVehicleSelector();
@@ -236,6 +265,24 @@ document.addEventListener('DOMContentLoaded', function () {
         logoutBtn.addEventListener('click', function () {
             SaurusAuth.logout();
             location.reload();
+        });
+    }
+
+    // Volver a SuperAdmin rápidamente
+    var switchBackBtn = document.getElementById('btn-switch-superadmin');
+    if (switchBackBtn) {
+        switchBackBtn.addEventListener('click', function () {
+            dropdown.classList.remove('open');
+            var res = SaurusAuth.switchToSuperAdmin();
+            if (res.success) {
+                updateAuthUI();
+                updateVehicleDashboardHeader();
+                if (window.showNotification) {
+                    window.showNotification('Has vuelto a SuperAdministrador', 'info');
+                }
+            } else {
+                alert(res.error || 'No se pudo cambiar a SuperAdmin.');
+            }
         });
     }
 
