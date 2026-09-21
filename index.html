@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAURUS CoPilot - Estudio de Telemetría y Análisis ADAS para Dashcam</title>
+    <meta name="description" content="Plataforma avanzada de visualización y análisis de telemetría para dashcam con reproducción sincronizada de video, mapa GPS con mapa de calor, instrumental digital y sensores ADAS.">
+    <meta name="keywords" content="dashcam, telemetria, gps tracker, adas, g-force, telematics, instrumental automotriz, saurus, copilot">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
+    <!-- Application Stylesheet -->
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/auth.css" />
+</head>
+<body>
+
+    <!-- ====================================================================
+         Auth: Login Overlay
+         ==================================================================== -->
+    <div id="auth-login-overlay">
+        <div class="auth-login-card">
+            <div class="auth-card-logo">
+                <img src="assets/saurus-icon.png" alt="Logo SAURUS" />
+                <div class="auth-card-logo-title"><span>SAURUS</span> COPILOT</div>
+                <div class="auth-card-subtitle">Monitoreo de Flotas · ADAS · DMS</div>
+            </div>
+            <div class="auth-field">
+                <label for="login-username">Usuario</label>
+                <input type="text" id="login-username" placeholder="Nombre de usuario" autocomplete="username" />
+            </div>
+            <div class="auth-field">
+                <label for="login-password">Contraseña</label>
+                <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+            </div>
+            <button class="auth-btn-login" id="btn-do-login">Iniciar Sesión</button>
+            <div class="auth-login-error" id="login-error-msg">Usuario o contraseña incorrectos.</div>
+        </div>
+    </div>
+    <!-- ====================================================================
+         Top Global Header & Toolbar
+         ==================================================================== -->
+    <header class="apex-header">
+        <div class="header-container">
+            <div class="brand-section">
+                <div class="brand-logo" id="brand-logo-icon">
+                    <img src="assets/saurus-icon.png" alt="Logo SAURUS CoPilot" class="brand-logo-img" />
+                </div>
+                <div>
+                    <h1 class="brand-title">
+                        <span class="brand-saurus">SAURUS</span>
+                        <span class="brand-copilot">COPILOT</span>
+                    </h1>
+                    <p class="brand-subtitle">MONITOREO DE FLOTAS-ADAS-DMS</p>
+                </div>
+            </div>
+
+            <div class="header-controls">
+                <!-- Scenario Selector -->
+                <div class="scenario-box">
+                    <label for="scenario-select">Escenario:</label>
+                    <select id="scenario-select" class="scenario-select" title="Seleccionar tramo de demostración"></select>
+                </div>
+
+                <!-- Unit Switcher -->
+                <div class="unit-switch" id="unit-switcher">
+                    <button class="unit-btn active" data-unit="metric" id="btn-unit-kmh">KM/H</button>
+                    <button class="unit-btn" data-unit="imperial" id="btn-unit-mph">MPH</button>
+                </div>
+
+                <!-- Upload Video Button -->
+                <label for="video-input" class="btn-header" title="Sincronizar archivo de video MP4">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                    </svg>
+                    <span>Cargar Video</span>
+                </label>
+                <input type="file" id="video-input" accept="video/mp4,video/webm" style="display: none;" />
+
+                <!-- Upload Telemetry Button -->
+                <label for="file-input" class="btn-header primary" title="Importar archivo JSON, GPX o CSV">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span>Cargar Telemetría</span>
+                </label>
+                <input type="file" id="file-input" accept=".json,.gpx,.csv" style="display: none;" />
+
+                <!-- Export Report Button -->
+                <button class="btn-header" id="btn-export-report" title="Generar reporte imprimible de incidentes">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span>Reporte</span>
+                </button>
+
+                <!-- ─── Selector de Vehículo ─── -->
+                <div id="auth-vehicle-selector">
+                    <label for="auth-vehicle-select">Vehículo:</label>
+                    <select id="auth-vehicle-select" title="Seleccionar vehículo activo"></select>
+                </div>
+
+                <!-- ─── Badge de Usuario ─── -->
+                <div id="auth-user-badge" title="Opciones de usuario">
+                    <div class="auth-badge-avatar" id="auth-badge-initials">SA</div>
+                    <div class="auth-badge-info">
+                        <span class="auth-badge-name" id="auth-badge-name">Super Admin</span>
+                        <span class="auth-badge-role role-superadmin" id="auth-badge-role">SuperAdmin</span>
+                    </div>
+                    <!-- Dropdown -->
+                    <div class="auth-badge-dropdown" id="auth-badge-dropdown">
+                        <button class="auth-dropdown-item" id="btn-open-admin-panel">
+                            🛡️ Panel de Administración
+                        </button>
+                        <div class="auth-dropdown-divider"></div>
+                        <button class="auth-dropdown-item danger" id="btn-logout">
+                            🚪 Cerrar Sesión
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <!-- ====================================================================
+         Main Telemetry Dashboard View
+         ==================================================================== -->
+    <main class="app-container">
+        <!-- Trip Summary Header Ribbon -->
+        <section class="trip-summary-bar" aria-label="Resumen del trayecto">
+            <div class="trip-info-left">
+                <div class="trip-icon-badge" id="trip-icon-badge">🚗</div>
+                <div>
+                    <h2 class="route-title" id="route-title">Trayecto Urbano - Alertas ADAS</h2>
+                    <p class="route-location" id="route-location">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
+                        </svg>
+                        Avenida Central - Gran Vía
+                    </p>
+                </div>
+            </div>
+
+            <div class="trip-stats-right">
+                <div class="stat-pill">
+                    <span class="stat-pill-label">Puntaje Seguridad</span>
+                    <span class="stat-pill-value grade-a" id="safety-score-val">82</span>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-pill-label">Calificación</span>
+                    <span class="stat-pill-value" id="safety-score-grade" style="color: var(--cyan-neon);">B+</span>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-pill-label">Pico G Lateral</span>
+                    <span class="stat-pill-value" id="g-peak-lat">0.49G</span>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-pill-label">Pico G Longitudinal</span>
+                    <span class="stat-pill-value" id="g-peak-long">-0.78G</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Primary Dual-Column Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Left Column: Dashcam Player + Interactive Map -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Panel: Multi-Camera Station & Driver Monitoring System (DMS) -->
+                <article class="panel-card multicam-card" aria-label="Visualizador Multi-Cámara y DMS">
+                    <header class="panel-header">
+                        <div class="panel-title-group">
+                            <svg class="panel-title-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                                <line x1="7" y1="2" x2="7" y2="22"></line>
+                                <line x1="17" y1="2" x2="17" y2="22"></line>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                            </svg>
+                            <h3 class="panel-title">Estación Multi-Cámara & DMS</h3>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="cam-badge-ch-count">5 CANALES SINCRONIZADOS</span>
+                            <span id="video-source-badge" style="font-size: 0.72rem; color: var(--cyan-neon); font-family: var(--font-mono); font-weight: bold; background: rgba(0,242,254,0.1); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0,242,254,0.25);">
+                                SIMULADOR 60 FPS
+                            </span>
+                        </div>
+                    </header>
+
+                    <!-- Multi-Camera Control Toolbar -->
+                    <div class="multicam-toolbar">
+                        <div class="multicam-view-selector" role="tablist" aria-label="Selector de cámaras y vistas">
+                            <button type="button" class="cam-view-btn active" data-view="grid" id="btn-view-grid" title="Ver matriz con las 5 cámaras simultáneas (Tecla 0 o G)">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="7" height="7"></rect>
+                                    <rect x="14" y="3" width="7" height="7"></rect>
+                                    <rect x="14" y="14" width="7" height="7"></rect>
+                                    <rect x="3" y="14" width="7" height="7"></rect>
+                                </svg>
+                                <span>Matriz 5-CH</span>
+                            </button>
+                            <button type="button" class="cam-view-btn" data-view="front" id="btn-view-front" title="Cámara Frontal ADAS (Tecla 1)">
+                                <span class="cam-btn-dot dot-front"></span>
+                                <span>CH1 Frontal</span>
+                            </button>
+                            <button type="button" class="cam-view-btn" data-view="rear" id="btn-view-rear" title="Cámara Trasera RCW (Tecla 2)">
+                                <span class="cam-btn-dot dot-rear"></span>
+                                <span>CH2 Trasera</span>
+                            </button>
+                            <button type="button" class="cam-view-btn" data-view="left" id="btn-view-left" title="Cámara Lateral Izquierda BSD-L (Tecla 3)">
+                                <span class="cam-btn-dot dot-left"></span>
+                                <span>CH3 Lat. Izq</span>
+                            </button>
+                            <button type="button" class="cam-view-btn" data-view="right" id="btn-view-right" title="Cámara Lateral Derecha BSD-R (Tecla 4)">
+                                <span class="cam-btn-dot dot-right"></span>
+                                <span>CH4 Lat. Der</span>
+                            </button>
+                            <button type="button" class="cam-view-btn" data-view="dms" id="btn-view-dms" title="Cámara DMS Cabina Conductor (Tecla 5)">
+                                <span class="cam-btn-dot dot-dms"></span>
+                                <span>CH5 DMS Cabina</span>
+                            </button>
+                        </div>
+                        <div class="multicam-actions">
+                            <button type="button" class="cam-action-btn active" id="btn-cam-audio-toggle" title="Activar / Desactivar alarmas sonoras DMS y ADAS">
+                                <svg id="cam-audio-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                </svg>
+                                <span id="cam-audio-label">Alarma ON</span>
+                            </button>
+                            <button type="button" class="cam-action-btn" id="btn-cam-fullscreen" title="Maximizar estación multi-cámara en pantalla completa">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Multi-Camera Viewport Container (Interactive 5-Channel Canvas Grid) -->
+                    <div class="multicam-viewport-container view-grid" id="multicam-container">
+                        <!-- Camera 1: Frontal (Road ADAS Simulator or Real Video) -->
+                        <div class="cam-window cam-front is-primary" id="cam-window-front" data-cam="front" role="button" tabindex="0" title="CH1: Haz clic para ampliar o enfocar">
+                            <div class="cam-header-strip">
+                                <div class="cam-title">
+                                    <span class="cam-ch-badge ch-1">CH1</span>
+                                    <span>FRONTAL // ROAD ADAS</span>
+                                </div>
+                                <div class="cam-header-meta">
+                                    <span class="cam-live-indicator"></span>
+                                    <span class="cam-res-badge">1080P 60FPS</span>
+                                    <button type="button" class="cam-focus-icon-btn" title="Enfocar esta cámara">⛶</button>
+                                </div>
+                            </div>
+                            <div class="cam-canvas-wrapper" id="dashcam-viewport">
+                                <video id="dashcam-video" playsinline muted></video>
+                                <canvas id="dashcam-canvas"></canvas>
+                                <div class="cam-hover-overlay">
+                                    <span>CLIC PARA ENFOCAR</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Camera 2: Trasera (RCW / Parking Trajectory) -->
+                        <div class="cam-window cam-rear" id="cam-window-rear" data-cam="rear" role="button" tabindex="0" title="CH2: Haz clic para ampliar o enfocar">
+                            <div class="cam-header-strip">
+                                <div class="cam-title">
+                                    <span class="cam-ch-badge ch-2">CH2</span>
+                                    <span>TRASERA // RCW</span>
+                                </div>
+                                <div class="cam-header-meta">
+                                    <span class="cam-live-indicator"></span>
+                                    <span class="cam-res-badge">1080P 30FPS</span>
+                                    <button type="button" class="cam-focus-icon-btn" title="Enfocar esta cámara">⛶</button>
+                                </div>
+                            </div>
+                            <div class="cam-canvas-wrapper">
+                                <canvas id="rear-canvas"></canvas>
+                                <div class="cam-hover-overlay">
+                                    <span>CLIC PARA ENFOCAR</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Camera 3: Lateral Izquierda (BSD-L Blind Spot) -->
+                        <div class="cam-window cam-left" id="cam-window-left" data-cam="left" role="button" tabindex="0" title="CH3: Haz clic para ampliar o enfocar">
+                            <div class="cam-header-strip">
+                                <div class="cam-title">
+                                    <span class="cam-ch-badge ch-3">CH3</span>
+                                    <span>LATERAL IZQ // BSD-L</span>
+                                </div>
+                                <div class="cam-header-meta">
+                                    <span class="cam-live-indicator"></span>
+                                    <span class="cam-res-badge">720P 30FPS</span>
+                                    <button type="button" class="cam-focus-icon-btn" title="Enfocar esta cámara">⛶</button>
+                                </div>
+                            </div>
+                            <div class="cam-canvas-wrapper">
+                                <canvas id="left-canvas"></canvas>
+                                <div class="cam-hover-overlay">
+                                    <span>CLIC PARA ENFOCAR</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Camera 4: Lateral Derecha (BSD-R Blind Spot) -->
+                        <div class="cam-window cam-right" id="cam-window-right" data-cam="right" role="button" tabindex="0" title="CH4: Haz clic para ampliar o enfocar">
+                            <div class="cam-header-strip">
+                                <div class="cam-title">
+                                    <span class="cam-ch-badge ch-4">CH4</span>
+                                    <span>LATERAL DER // BSD-R</span>
+                                </div>
+                                <div class="cam-header-meta">
+                                    <span class="cam-live-indicator"></span>
+                                    <span class="cam-res-badge">720P 30FPS</span>
+                                    <button type="button" class="cam-focus-icon-btn" title="Enfocar esta cámara">⛶</button>
+                                </div>
+                            </div>
+                            <div class="cam-canvas-wrapper">
+                                <canvas id="right-canvas"></canvas>
+                                <div class="cam-hover-overlay">
+                                    <span>CLIC PARA ENFOCAR</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Camera 5: DMS Cabina (Driver Monitoring System / Biometrics IR) -->
+                        <div class="cam-window cam-dms" id="cam-window-dms" data-cam="dms" role="button" tabindex="0" title="CH5: Haz clic para ampliar o enfocar">
+                            <div class="cam-header-strip">
+                                <div class="cam-title">
+                                    <span class="cam-ch-badge ch-5">CH5</span>
+                                    <span>DMS CABINA // IR AI</span>
+                                </div>
+                                <div class="cam-header-meta">
+                                    <span class="cam-live-indicator"></span>
+                                    <span class="cam-res-badge">720P IR 30FPS</span>
+                                    <button type="button" class="cam-focus-icon-btn" title="Enfocar esta cámara">⛶</button>
+                                </div>
+                            </div>
+                            <div class="cam-canvas-wrapper">
+                                <canvas id="dms-canvas"></canvas>
+                                <div class="cam-hover-overlay">
+                                    <span>CLIC PARA ENFOCAR</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DMS Live Biometrics & Attention Ribbon -->
+                    <div class="dms-telemetry-ribbon" aria-label="Métricas de Monitoreo del Conductor DMS">
+                        <div class="dms-ribbon-title">
+                            <span class="dms-pulse-dot"></span>
+                            <span class="dms-title-text">DMS BIOMETRÍA</span>
+                        </div>
+                        <div class="dms-metrics-grid">
+                            <div class="dms-metric-item">
+                                <span class="dms-metric-label">ESTADO CONDUCTOR</span>
+                                <span class="dms-badge status-normal" id="dms-status-pill">NORMAL</span>
+                            </div>
+                            <div class="dms-metric-item">
+                                <span class="dms-metric-label">PERCLOS (OJOS)</span>
+                                <span class="dms-metric-value" id="dms-perclos-val">6%</span>
+                            </div>
+                            <div class="dms-metric-item">
+                                <span class="dms-metric-label">PARPADEO</span>
+                                <span class="dms-metric-value" id="dms-blink-val">15 bpm</span>
+                            </div>
+                            <div class="dms-metric-item">
+                                <span class="dms-metric-label">SCORE ATENCIÓN</span>
+                                <span class="dms-metric-value" id="dms-score-val" style="color: var(--cyan-neon);">96%</span>
+                            </div>
+                            <div class="dms-metric-item">
+                                <span class="dms-metric-label">USO CELULAR</span>
+                                <span class="dms-metric-value" id="dms-phone-val" style="color: #10b981;">NO</span>
+                            </div>
+                            <div class="dms-metric-item">
+                                <span class="dms-metric-label">CINTURÓN</span>
+                                <span class="dms-metric-value" id="dms-belt-val" style="color: #10b981;">ABROCHADO</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HUD & Multi-Camera Overlay Options Bar -->
+                    <div class="hud-options-bar">
+                        <div class="hud-toggles">
+                            <label class="hud-checkbox-label" title="Cajas de detección ADAS para vehículos y peatones">
+                                <input type="checkbox" id="toggle-adas-boxes" checked>
+                                <span>Bounding Boxes ADAS</span>
+                            </label>
+                            <label class="hud-checkbox-label" title="Líneas y advertencia de salida de carril">
+                                <input type="checkbox" id="toggle-adas-lanes" checked>
+                                <span>Guías Carril</span>
+                            </label>
+                            <label class="hud-checkbox-label" title="Pitch y Roll giroscópico">
+                                <input type="checkbox" id="toggle-adas-horizon" checked>
+                                <span>Horizonte</span>
+                            </label>
+                            <label class="hud-checkbox-label" title="Malla y puntos de seguimiento facial en DMS">
+                                <input type="checkbox" id="toggle-dms-bio" checked>
+                                <span>Malla DMS</span>
+                            </label>
+                            <label class="hud-checkbox-label" title="Arcos de radar BSD en retrovisores">
+                                <input type="checkbox" id="toggle-bsd-radars" checked>
+                                <span>Radares BSD</span>
+                            </label>
+                            <label class="hud-checkbox-label" title="Líneas de distancia de reversa en cámara trasera">
+                                <input type="checkbox" id="toggle-rear-guides" checked>
+                                <span>Guías Reversa</span>
+                            </label>
+                        </div>
+                        <div class="hud-hint">
+                            Selecciona cualquier cámara • Teclas 1-5 o 0
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Panel: GPS Cartography & Route Heatmap -->
+                <article class="panel-card" aria-label="Rastreador de Ruta GPS">
+                    <header class="panel-header">
+                        <div class="panel-title-group">
+                            <svg class="panel-title-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                                <line x1="8" y1="2" x2="8" y2="18"></line>
+                                <line x1="16" y1="6" x2="16" y2="22"></line>
+                            </svg>
+                            <h3 class="panel-title">Rastreo GPS & Mapa de Calor de Velocidad</h3>
+                        </div>
+                        <div style="font-size: 0.72rem; color: #94a3b8; display: flex; gap: 8px;">
+                            <span><span style="color: #00f2fe;">●</span> Normal</span>
+                            <span><span style="color: #ffb703;">●</span> Media</span>
+                            <span><span style="color: #ff3366;">●</span> Alta/Frenada</span>
+                        </div>
+                    </header>
+
+                    <div class="map-panel-wrapper">
+                        <button class="btn-map-recenter" id="btn-map-recenter">Centrar en Vehículo</button>
+                        <div id="gps-map-container"></div>
+                    </div>
+                </article>
+            </div>
+
+            <!-- Right Column: Cockpit Instruments & Incident Log -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Panel: Cockpit Cluster Gauges -->
+                <article class="panel-card" aria-label="Instrumental de Cabina">
+                    <header class="panel-header">
+                        <div class="panel-title-group">
+                            <svg class="panel-title-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+                            </svg>
+                            <h3 class="panel-title">Instrumental de Cockpit Digital</h3>
+                        </div>
+                        <span id="meter-rpm-val" class="font-mono" style="font-size: 0.8rem; color: var(--cyan-neon); font-weight: bold;">
+                            850 RPM
+                        </span>
+                    </header>
+
+                    <div class="cluster-container">
+                        <!-- Shift Lights Strip -->
+                        <div class="shift-lights-bar" title="Luces progresivas de régimen de RPM">
+                            <div class="shift-light"></div>
+                            <div class="shift-light"></div>
+                            <div class="shift-light"></div>
+                            <div class="shift-light"></div>
+                            <div class="shift-light"></div>
+                            <div class="shift-light"></div>
+                            <div class="shift-light"></div>
+                            <div class="shift-light"></div>
+                            <div class="shift-light"></div>
+                            <div class="shift-light"></div>
+                        </div>
+
+                        <!-- Speedometer + G-Force Dials -->
+                        <div class="gauges-split-row">
+                            <div class="gauge-canvas-wrapper" title="Velocímetro digital y analógico">
+                                <canvas id="speed-gauge-canvas"></canvas>
+                            </div>
+                            <div class="gauge-canvas-wrapper" title="Acelerómetro IMU / Círculo de Fricción de Fuerzas G">
+                                <canvas id="g-force-canvas"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Gear & Pedals Subsection -->
+                        <div class="pedals-and-gear-row">
+                            <!-- Marcha -->
+                            <div class="gear-display-box" title="Marcha actual engranada">
+                                <span class="gear-box-label">GEAR</span>
+                                <span class="gear-box-val" id="meter-gear-val">1</span>
+                            </div>
+
+                            <!-- Acelerador -->
+                            <div class="pedal-meter-col">
+                                <div class="pedal-label-row">
+                                    <span style="color: var(--cyan-neon);">Gas / TPS</span>
+                                    <span class="font-mono" id="meter-throttle-val" style="color: var(--cyan-neon);">0%</span>
+                                </div>
+                                <div class="pedal-bar-track">
+                                    <div class="pedal-bar-fill throttle-fill" id="meter-throttle-fill"></div>
+                                </div>
+                            </div>
+
+                            <!-- Freno -->
+                            <div class="pedal-meter-col">
+                                <div class="pedal-label-row">
+                                    <span style="color: var(--red-alert);">Freno / ABS</span>
+                                    <span class="font-mono" id="meter-brake-val" style="color: var(--red-alert);">0%</span>
+                                </div>
+                                <div class="pedal-bar-track">
+                                    <div class="pedal-bar-fill brake-fill" id="meter-brake-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Panel: Incident Log & Driving Events -->
+                <article class="panel-card" style="flex: 1;" aria-label="Registro de Incidentes">
+                    <header class="panel-header">
+                        <div class="panel-title-group">
+                            <svg class="panel-title-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            <h3 class="panel-title">Registro de Incidentes y ADAS</h3>
+                        </div>
+                        <span class="incident-badge badge-warning" id="incident-count-badge">0 Eventos</span>
+                    </header>
+
+                    <div class="incident-table-wrapper" style="max-height: 250px; overflow-y: auto;">
+                        <table class="incident-table">
+                            <thead>
+                                <tr>
+                                    <th>Tiempo</th>
+                                    <th>Tipo</th>
+                                    <th>Descripción</th>
+                                    <th>Valor</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incident-table-body">
+                                <!-- Populated dynamically by app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+            </div>
+        </div>
+
+        <!-- ====================================================================
+             Bottom Master Synchronized Timeline & Scrubber Panel
+             ==================================================================== -->
+        <footer class="timeline-panel" aria-label="Barra de transporte y scrubber sincronizado">
+            <div class="timeline-header-row">
+                <div class="timeline-title">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    <span>Línea Temporal Multicanal (Velocidad & Picos G)</span>
+                </div>
+
+                <!-- Clock Readout -->
+                <div class="time-clock-box">
+                    <span class="time-clock-current" id="time-display-val">00:00.0</span>
+                    <span class="time-clock-separator">/</span>
+                    <span class="time-clock-duration" id="time-duration-val">01:05</span>
+                </div>
+            </div>
+
+            <!-- Scrubber Canvas Bar -->
+            <div class="timeline-scrubber-box" id="timeline-container" title="Haz clic o arrastra para desplazarte en el tiempo">
+                <canvas id="timeline-chart-canvas"></canvas>
+                <div class="timeline-progress-bar" id="timeline-progress"></div>
+                <div class="timeline-playhead-line" id="timeline-playhead"></div>
+            </div>
+
+            <!-- Transport Control Buttons -->
+            <div class="transport-controls-row">
+                <div class="transport-main-btns">
+                    <!-- Prev Incident -->
+                    <button class="btn-transport" id="btn-prev-incident" title="Incidente Anterior (Tecla P)">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="19 20 9 12 19 4 19 20"></polygon>
+                            <line x1="5" y1="19" x2="5" y2="5"></line>
+                        </svg>
+                    </button>
+
+                    <!-- Play / Pause Hero Button -->
+                    <button class="btn-transport btn-play-hero" id="btn-play" title="Reproducir / Pausar (Espacio)">
+                        <svg id="btn-play-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <polygon points="5,3 19,12 5,21"></polygon>
+                        </svg>
+                    </button>
+
+                    <!-- Next Incident -->
+                    <button class="btn-transport" id="btn-next-incident" title="Siguiente Incidente (Tecla N)">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                            <line x1="19" y1="5" x2="19" y2="19"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Playback Rate Multipliers -->
+                <div class="rate-selector">
+                    <button class="rate-btn" data-rate="0.5">0.5x</button>
+                    <button class="rate-btn active" data-rate="1.0">1.0x</button>
+                    <button class="rate-btn" data-rate="2.0">2.0x</button>
+                    <button class="rate-btn" data-rate="4.0">4.0x</button>
+                </div>
+
+                <!-- Keyboard shortcuts hint -->
+                <div style="font-size: 0.75rem; color: #64748b;">
+                    <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f1f5f9;">Espacio</kbd> Play/Pause &nbsp;•&nbsp; 
+                    <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f1f5f9;">← / →</kbd> ±5 seg &nbsp;•&nbsp;
+                    <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f1f5f9;">N</kbd> Siguiente Incidente
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <!-- ====================================================================
+         Printable Incident Inspection Report Modal
+         ==================================================================== -->
+    <div class="modal-backdrop" id="report-modal">
+        <div class="modal-content">
+            <header class="modal-header">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <img src="assets/saurus-icon.png" alt="SAURUS CoPilot" style="width: 38px; height: 38px; object-fit: contain; filter: drop-shadow(0 0 6px rgba(0, 38, 170, 0.5));" />
+                    <div>
+                        <h3 style="font-family: var(--font-gauge); font-size: 1.3rem; color: #ffffff;">Informe de Auditoría de Telemetría</h3>
+                        <p style="font-size: 0.8rem; color: #94a3b8;"><span style="color: #cbd5e1; font-weight: 800; letter-spacing: 0.8px;">SAURUS</span> <span style="color: #f93f04; font-weight: 800; letter-spacing: 0.8px;">COPILOT</span> Telematics & Incident Analysis Report</p>
+                    </div>
+                </div>
+                <button class="btn-header" id="btn-close-modal">Cerrar</button>
+            </header>
+
+            <div class="modal-kpis">
+                <div class="kpi-card">
+                    <div class="kpi-card-title">Duración</div>
+                    <div class="kpi-card-val" id="rep-total-time">65 seg</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-card-title">Vel. Máxima</div>
+                    <div class="kpi-card-val" id="rep-max-speed">55 km/h</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-card-title">Vel. Promedio</div>
+                    <div class="kpi-card-val" id="rep-avg-speed">38 km/h</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-card-title">Frenadas Bruscas</div>
+                    <div class="kpi-card-val" id="rep-harsh-brakes" style="color: var(--red-alert);">1</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-card-title">Salidas Carril</div>
+                    <div class="kpi-card-val" id="rep-lane-departures" style="color: var(--amber-warning);">1</div>
+                </div>
+            </div>
+
+            <h4 style="font-size: 0.95rem; margin-bottom: 10px; color: #ffffff;">Detalle de Eventos Registrados:</h4>
+            <div class="incident-table-wrapper">
+                <table class="incident-table">
+                    <thead>
+                        <tr>
+                            <th>Tiempo</th>
+                            <th>Evento</th>
+                            <th>Gravedad</th>
+                            <th>Descripción</th>
+                            <th>Magnitud</th>
+                            <th>Clip de Video</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rep-incidents-table">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="font-size: 0.78rem; color: #64748b;">
+                    <span>* Cada alerta incluye enlace directo al clip de video telemático correspondiente.</span>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn-header" id="btn-export-csv" title="Descargar planilla completa en formato CSV para Excel y Google Sheets">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Descargar Planilla CSV / Excel</span>
+                    </button>
+                    <button class="btn-header primary" id="btn-print-report" title="Imprimir o guardar como PDF">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                            <rect x="6" y="14" width="12" height="8"></rect>
+                        </svg>
+                        <span>Imprimir / Exportar PDF</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================================
+         Incident Clip Video Evidence & Linker Modal
+         ==================================================================== -->
+    <div class="modal-backdrop" id="clip-viewer-modal">
+        <div class="modal-content clip-modal-content">
+            <header class="modal-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 1.5rem;">🎬</span>
+                    <div>
+                        <h3 style="font-family: var(--font-gauge); font-size: 1.2rem; color: #ffffff;">Clip de Evidencia de Video</h3>
+                        <p style="font-size: 0.78rem; color: #94a3b8;">Inspección y gestión de enlace multimedia de la alerta telemática</p>
+                    </div>
+                </div>
+                <button class="btn-header" id="btn-close-clip-modal">Cerrar</button>
+            </header>
+
+            <!-- Incident Brief Summary -->
+            <div class="clip-incident-summary" id="clip-incident-summary">
+                <!-- Dynamically filled: Type, time, severity, value, speed -->
+            </div>
+
+            <!-- Clip Video Preview Container -->
+            <div class="clip-video-box">
+                <div class="clip-video-wrapper">
+                    <video id="clip-video-element" controls playsinline preload="auto" style="display: none; width: 100%; border-radius: 8px; background: #000;"></video>
+                    <canvas id="clip-canvas-preview" width="640" height="360" style="width: 100%; border-radius: 8px; background: #0b0f17; display: block;"></canvas>
+                    <div class="clip-hud-watermark" id="clip-hud-watermark">
+                        <span class="clip-watermark-time" id="clip-watermark-time">00:00.0</span>
+                        <span class="clip-watermark-tag" id="clip-watermark-tag">REC ● ALERTA</span>
+                    </div>
+                </div>
+                <div class="clip-playback-controls">
+                    <button class="btn-clip-ctrl" id="btn-clip-play-pause">
+                        <svg id="clip-play-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="5 3 19 12 5 21"></polygon></svg>
+                        <span id="clip-play-label">Reproducir</span>
+                    </button>
+                    <button class="btn-clip-ctrl active" id="btn-clip-loop" title="Repetir en bucle la ventana del incidente">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                        <span id="clip-loop-label">Bucle: ON</span>
+                    </button>
+                    <div class="clip-time-indicator font-mono" id="clip-time-window-badge">
+                        Ventana: 00:00 - 00:00 (6.0s)
+                    </div>
+                    <button class="btn-header secondary" id="btn-clip-seek-main" title="Cerrar modal y posicionar el reproductor general en este segundo">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="12 8 8 12 12 16 12 8"></polygon></svg>
+                        <span>Abrir en Dashboard</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Clip Link Management Section -->
+            <div class="clip-link-section">
+                <h4 style="font-size: 0.88rem; color: #cbd5e1; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                    <span>Enlace del Clip de Video</span>
+                    <span class="clip-badge-source" id="clip-source-badge">Predeterminado</span>
+                </h4>
+                <div class="clip-url-input-group">
+                    <input type="text" id="clip-url-input" class="clip-input-text" placeholder="https://almacenamiento.cloud/clips/incidente.mp4..." spellcheck="false" />
+                    <button class="btn-header" id="btn-save-clip-url" title="Guardar y actualizar enlace para este incidente">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                        <span>Guardar</span>
+                    </button>
+                    <button class="btn-header" id="btn-copy-clip-url" title="Copiar enlace al portapapeles">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        <span>Copiar</span>
+                    </button>
+                </div>
+
+                <div class="clip-file-attach-row">
+                    <label class="btn-header file-label-btn" for="clip-local-file-input">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                        <span>Vincular Archivo de Video Local (.mp4 / .webm)</span>
+                    </label>
+                    <input type="file" id="clip-local-file-input" accept="video/mp4,video/webm,video/ogg" style="display: none;" />
+                    <button class="btn-header" id="btn-reset-clip-url" title="Restaurar enlace predeterminado de telemetría" style="margin-left: auto;">
+                        Restaurar Predeterminado
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts: Leaflet and Application Modules -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/dataset-samples.js"></script>
+    <script src="js/telemetry-engine.js"></script>
+    <script src="js/hud-overlay.js"></script>
+    <script src="js/multi-camera-engine.js"></script>
+    <script src="js/gauges.js"></script>
+    <script src="js/map-module.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin-panel.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
