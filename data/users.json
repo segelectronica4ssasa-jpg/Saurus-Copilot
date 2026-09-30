@@ -23,5 +23,41 @@
     ],
     "createdAt": "2026-09-21T12:00:00.000Z",
     "active": true
+  },
+  {
+    "id": "user-1790767874601",
+    "username": "operador01",
+    "password": "Operador2026!",
+    "passwordHash": "T3BlcmFkb3IyMDI2IQ==",
+    "displayName": "Operador Prueba",
+    "role": "user",
+    "permissions": [
+      "view_telemetry",
+      "view_map"
+    ],
+    "assignedVehicles": [
+      "veh-001"
+    ],
+    "createdAt": "2026-09-30T11:31:14Z",
+    "active": true
+  },
+  {
+    "id": "user-1790768010758",
+    "username": "Fausto-Copilot",
+    "password": "Saurus2026!",
+    "passwordHash": "U2F1cnVzMjAyNiE=",
+    "displayName": "Fausto Lopez",
+    "role": "user",
+    "permissions": [
+      "view_telemetry",
+      "view_map",
+      "view_incidents",
+      "view_gauges",
+      "change_scenario",
+      "switch_units"
+    ],
+    "assignedVehicles": [],
+    "createdAt": "2026-09-30T11:33:30Z",
+    "active": true
   }
 ]

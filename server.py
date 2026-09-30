@@ -90,9 +90,11 @@ def save_json(filepath, data):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def sanitize_user(user):
+def sanitize_user(user, include_hash=False):
     safe = dict(user)
     safe.pop("password", None)
+    if not include_hash:
+        safe.pop("passwordHash", None)
     return safe
 
 class SaurusFleetHandler(SimpleHTTPRequestHandler):
@@ -135,11 +137,11 @@ class SaurusFleetHandler(SimpleHTTPRequestHandler):
         path = parsed.path
 
         if path == "/api/sync":
-            # Devuelve usuarios (sin passwords) y vehículos
+            # Devuelve usuarios con passwordHash (necesario para login local) y vehículos
             users = load_json(USERS_FILE)
             vehicles = load_json(VEHICLES_FILE)
             self.send_json_response({
-                "users": [sanitize_user(u) for u in users],
+                "users": [sanitize_user(u, include_hash=True) for u in users],
                 "vehicles": vehicles
             })
             return
@@ -197,25 +199,22 @@ class SaurusFleetHandler(SimpleHTTPRequestHandler):
                 self.send_json_response({"success": False, "error": f"La cuenta de '{username}' está desactivada."}, 403)
                 return
 
-            # Validar hash base64
-            saved_pass = matched_user.get("password", "")
-            
-            # Formas posibles de codificación
+            # Validar contraseña con tolerancia a múltiples formas de almacenamiento
             import base64
-            raw_b64 = base64.b64encode(password.encode("utf-8")).decode("utf-8")
-            
-            # Tolerancia de comparación
-            is_valid = (
-                saved_pass == password or
-                saved_pass == raw_b64 or
-                # Password sin padding o con urlquote
-                saved_pass.replace("=", "") == raw_b64.replace("=", "")
-            )
-
-            # Si se pasó el hash ya codificado desde el cliente
+            saved_pass = matched_user.get("password", "")     # puede ser hash b64 o plana
+            saved_hash = matched_user.get("passwordHash", "") # hash b64 explícito
+            raw_b64    = base64.b64encode(password.encode("utf-8")).decode("utf-8")
             client_hash = str(body.get("passwordHash", "")).strip()
-            if client_hash and saved_pass == client_hash:
-                is_valid = True
+
+            is_valid = any([
+                saved_pass == password,           # contraseña plana guardada
+                saved_pass == raw_b64,            # contraseña guardada como b64
+                saved_hash == raw_b64,            # passwordHash coincide con b64 del input
+                saved_hash == client_hash and client_hash != "",  # hash enviado por cliente
+                saved_pass == client_hash and client_hash != "",  # password field == hash cliente
+                saved_pass.replace("=", "") == raw_b64.replace("=", ""),  # sin padding
+                saved_hash.replace("=", "") == raw_b64.replace("=", ""),  # hash sin padding
+            ])
 
             if not is_valid:
                 self.send_json_response({"success": False, "error": f"Contraseña incorrecta para el usuario '{username}'."}, 401)
@@ -256,12 +255,14 @@ class SaurusFleetHandler(SimpleHTTPRequestHandler):
                     return
 
             import time, base64
+            # Guardar tanto la contraseña plana (para fallback) como el hash b64
             pass_hash = body.get("passwordHash") or base64.b64encode(password.encode("utf-8")).decode("utf-8")
 
             new_user = {
                 "id": f"user-{int(time.time() * 1000)}",
                 "username": username,
-                "password": pass_hash,
+                "password": password,          # contraseña plana (para comparación directa)
+                "passwordHash": pass_hash,     # hash b64 (para comparación con cliente)
                 "displayName": display_name,
                 "role": role,
                 "permissions": permissions,
@@ -323,7 +324,10 @@ class SaurusFleetHandler(SimpleHTTPRequestHandler):
                     if "displayName" in body: u["displayName"] = str(body["displayName"]).strip()
                     if "password" in body and body["password"]:
                         import base64
-                        u["password"] = body.get("passwordHash") or base64.b64encode(body["password"].encode("utf-8")).decode("utf-8")
+                        raw_pw = str(body["password"]).strip()
+                        new_hash = body.get("passwordHash") or base64.b64encode(raw_pw.encode("utf-8")).decode("utf-8")
+                        u["password"] = raw_pw       # contraseña plana para fallback directo
+                        u["passwordHash"] = new_hash  # hash b64 para validación con cliente
                     if "role" in body and u.get("role") != "superadmin": u["role"] = body["role"]
                     if "permissions" in body: u["permissions"] = body["permissions"]
                     if "assignedVehicles" in body: u["assignedVehicles"] = body["assignedVehicles"]
