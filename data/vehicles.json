@@ -1,0 +1,26 @@
+[
+  {
+    "id": "veh-001",
+    "plate": "AF-742-AA",
+    "alias": "Camión Scania R450",
+    "type": "truck",
+    "description": "Unidad de transporte de carga pesada - Ruta Nacional",
+    "createdAt": "2026-09-21T12:00:00.000Z"
+  },
+  {
+    "id": "veh-002",
+    "plate": "AG-120-BC",
+    "alias": "Toyota Hilux 4x4",
+    "type": "car",
+    "description": "Móvil de supervisión técnica y patrullaje",
+    "createdAt": "2026-09-21T12:00:00.000Z"
+  },
+  {
+    "id": "veh-003",
+    "plate": "AE-983-CD",
+    "alias": "Mercedes Sprinter Van",
+    "type": "van",
+    "description": "Logística de distribución urbana y paquetería",
+    "createdAt": "2026-09-21T12:00:00.000Z"
+  }
+]

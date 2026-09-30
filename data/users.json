@@ -1,0 +1,27 @@
+[
+  {
+    "id": "superadmin-001",
+    "username": "superadmin",
+    "password": "U2F1cnVzMjAyNiE=",
+    "displayName": "Super Administrador",
+    "role": "superadmin",
+    "permissions": [
+      "view_telemetry",
+      "upload_telemetry",
+      "upload_video",
+      "export_report",
+      "view_map",
+      "view_incidents",
+      "view_gauges",
+      "change_scenario",
+      "switch_units"
+    ],
+    "assignedVehicles": [
+      "veh-001",
+      "veh-002",
+      "veh-003"
+    ],
+    "createdAt": "2026-09-21T12:00:00.000Z",
+    "active": true
+  }
+]

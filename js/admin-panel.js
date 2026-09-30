@@ -388,7 +388,7 @@
             .map(function (cb) { return cb.value; });
     }
 
-    function saveUserForm() {
+    async function saveUserForm() {
         var editId = document.getElementById('edit-user-id').value;
         var username = document.getElementById('form-username').value.trim();
         var displayName = document.getElementById('form-displayname').value.trim();
@@ -419,12 +419,12 @@
             // Actualizar
             var updates = { displayName: displayName, role: role, permissions: permissions, assignedVehicles: assignedVehicles };
             if (password) updates.password = password;
-            result = SaurusAuth.updateUser(editId, updates);
+            result = await SaurusAuth.updateUser(editId, updates);
         } else {
             // Crear
             if (!username) { setFormError('El nombre de usuario es obligatorio.'); return; }
             if (!password) { setFormError('La contraseña es obligatoria.'); return; }
-            result = SaurusAuth.createUser({
+            result = await SaurusAuth.createUser({
                 username: username,
                 password: password,
                 displayName: displayName,
@@ -439,6 +439,7 @@
             closeUserForm();
             renderUsersTable();
             updateVehicleSelector();
+            if (typeof window.renderLoginAccounts === 'function') window.renderLoginAccounts();
 
             if (!editId && created) {
                 var doSwitch = confirm('¡Usuario "' + (created.displayName || created.username) + '" registrado correctamente!\n\n¿Deseas iniciar sesión inmediatamente con esta cuenta para probarla?');
@@ -495,7 +496,7 @@
         document.getElementById('form-plate').disabled = false;
     }
 
-    function saveVehicleForm() {
+    async function saveVehicleForm() {
         var editId = document.getElementById('edit-vehicle-id').value;
         var plate = document.getElementById('form-plate').value.trim().toUpperCase();
         var alias = document.getElementById('form-alias').value.trim();
@@ -504,10 +505,10 @@
 
         var result;
         if (editId) {
-            result = SaurusAuth.updateVehicle(editId, { alias: alias, type: type, description: description });
+            result = await SaurusAuth.updateVehicle(editId, { alias: alias, type: type, description: description });
         } else {
             if (!plate) { showFeedback('vehicles-feedback', 'La patente es obligatoria.', 'error'); return; }
-            result = SaurusAuth.createVehicle({ plate: plate, alias: alias || plate, type: type, description: description });
+            result = await SaurusAuth.createVehicle({ plate: plate, alias: alias || plate, type: type, description: description });
         }
 
         if (result.success) {
@@ -557,20 +558,21 @@
         openUserForm(user);
     }
 
-    function toggleUser(userId) {
+    async function toggleUser(userId) {
         var users = SaurusAuth.listUsers();
         var user = users.find(function (u) { return u.id === userId; });
         if (!user) return;
-        var result = SaurusAuth.updateUser(userId, { active: !user.active });
+        var result = await SaurusAuth.updateUser(userId, { active: !user.active });
         if (result.success) renderUsersTable();
     }
 
-    function confirmDeleteUser(userId, username) {
+    async function confirmDeleteUser(userId, username) {
         if (!confirm('¿Eliminar al usuario "' + username + '"? Esta acción no se puede deshacer.')) return;
-        var result = SaurusAuth.deleteUser(userId);
+        var result = await SaurusAuth.deleteUser(userId);
         if (result.success) {
             showFeedback('users-feedback', 'Usuario eliminado.', 'success');
             renderUsersTable();
+            if (typeof window.renderLoginAccounts === 'function') window.renderLoginAccounts();
         } else {
             showFeedback('users-feedback', result.error || 'Error.', 'error');
         }
@@ -584,9 +586,9 @@
         openVehicleForm(vehicle);
     }
 
-    function confirmDeleteVehicle(vehicleId, plate) {
+    async function confirmDeleteVehicle(vehicleId, plate) {
         if (!confirm('¿Eliminar el vehículo "' + plate + '"? Se desasignará de todos los usuarios.')) return;
-        var result = SaurusAuth.deleteVehicle(vehicleId);
+        var result = await SaurusAuth.deleteVehicle(vehicleId);
         if (result.success) {
             showFeedback('vehicles-feedback', 'Vehículo eliminado.', 'success');
             renderVehiclesTable();
@@ -609,7 +611,7 @@
 
     // ─── Abrir / Cerrar modal ──────────────────────────────────────────────────
 
-    function open() {
+    async function open() {
         if (!SaurusAuth.canManageUsers()) return;
         var overlay = document.getElementById('auth-admin-overlay');
         if (!overlay) return;
@@ -617,6 +619,10 @@
         var isSA = SaurusAuth.isSuperAdmin();
         var btnShowVeh = document.getElementById('btn-show-vehicle-form');
         if (btnShowVeh) btnShowVeh.style.display = isSA ? 'inline-flex' : 'none';
+
+        if (SaurusAuth.syncWithServer) {
+            await SaurusAuth.syncWithServer();
+        }
 
         renderUsersTable();
         renderVehiclesTable();

@@ -19,11 +19,18 @@ document.addEventListener('DOMContentLoaded', function () {
     var loginPassword = document.getElementById('login-password');
     var loginError = document.getElementById('login-error-msg');
 
-    function renderLoginAccounts() {
+    async function renderLoginAccounts() {
         var container = document.getElementById('auth-quick-accounts');
-        if (!container || !SaurusAuth.getPublicUserSummary) return;
-        var list = SaurusAuth.getPublicUserSummary();
-        if (list.length === 0) {
+        if (!container) return;
+
+        var list = [];
+        if (SaurusAuth.fetchPublicUsers) {
+            list = await SaurusAuth.fetchPublicUsers();
+        } else if (SaurusAuth.getPublicUserSummary) {
+            list = SaurusAuth.getPublicUserSummary();
+        }
+
+        if (!list || list.length === 0) {
             container.innerHTML = '';
             return;
         }
@@ -57,8 +64,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         container.querySelectorAll('.auth-chip-quick-btn').forEach(function (btn) {
-            btn.addEventListener('click', function () {
+            btn.addEventListener('click', async function () {
                 var uname = btn.dataset.direct;
+                if (SaurusAuth.syncWithServer) await SaurusAuth.syncWithServer();
                 var allUsers = JSON.parse(localStorage.getItem('saurus_users') || '[]');
                 var uObj = allUsers.find(function (x) { return (x.username || '').toLowerCase() === uname.toLowerCase(); });
                 if (uObj) {
@@ -79,15 +87,16 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    window.renderLoginAccounts = renderLoginAccounts;
     renderLoginAccounts();
 
-    function attemptLogin() {
+    async function attemptLogin() {
         var u = loginUsername ? loginUsername.value : '';
         var p = loginPassword ? loginPassword.value : '';
         if (loginBtn) loginBtn.disabled = true;
         if (loginError) loginError.classList.remove('visible');
 
-        var result = SaurusAuth.login(u, p);
+        var result = await SaurusAuth.login(u, p);
         if (result.success) {
             if (loginBtn) loginBtn.disabled = false;
             if (overlay) {
